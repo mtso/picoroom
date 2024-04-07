@@ -10,11 +10,11 @@ const ROOM_RX = 200;
 const ROOM_RY = 100;
 
 const data = {
-  1: []
+   1: [],  2: [],  3: [],  4: [],  5: [],  6: [],  7: [],  8: [],  9: [], 10: [], 11: [], 12: [], 13: [], 14: [], 15: [], 16: [],
+  17: [], 18: [], 19: [], 20: [], 21: [], 22: [], 23: [], 24: [], 25: [], 26: [], 27: [], 28: [], 29: [], 30: [], 31: [],
 };
 
 function renderRoomData(room) {
-  let users = [];
   let userList = room.map((user) => `{id="${user.id}",t=${Math.floor(user.lastUpdateTime / 1000)},s=${user.sprite},x=${user.x},y=${user.y},c1=${user.color1},c2=${user.color2}}`).join(",");
   return `{users={${userList}}}`;
 }
@@ -70,8 +70,8 @@ http.createServer((req, res) => {
     if (userId.length > 24) {
       return renderClientError(res, "ID too long: " + userId);
     }
-    if (!range(0, 3).contains(+sprite)) {
-      return renderClientError(res, "sprite must be within 0 and 3");
+    if (!range(0, 4).contains(+sprite)) {
+      return renderClientError(res, "sprite must be within 0 and 4");
     }
     if (!range(1, 31).contains(+color1)) {
       return renderClientError(res, "color1 must be within 1 and 31");
