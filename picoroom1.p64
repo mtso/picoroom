@@ -1,0 +1,295 @@
+picotron cartridge // www.picotron.net
+version 2
+
+:: gfx/
+:: gfx/0.gfx
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3Iixtb2RpZmllZD0iMjAyNC0w
+NC0wNyAwMTo1MjozMyIscmV2aXNpb249Nzg5XV1sejQAbQEAACY0AADwE3tbMF09e2JtcD1weHUA
+QyAQEATwFkeQB0AHcBcAJgAXYAcCAFEAFgAWAAoAu2AXQBdwZ6AHAAfABADzBKAnACcwLGZsYWdz
+PTAscGFuX3gIAOp5PTAuNSx6b29tPTh9LG0A8hhgB5A3EAcQJzAHIAcABwAXABfgFyAXYAcQB8AH
+MAcgBiAGQBcgBgACAPEKJ1AGIAYwBwAH8AEHcBcwF4AHIAewBzAHADMAAAYAT4AXIBeFACGwsEeQ
+V4DHIGdAFxAEAPYCx0AGEAYABhAGYAYAFgAGABYIAAQYAAIIAO9wFiAW8AgnECdwNwA3IHkAHmHw
+JCcgJ1D7AHEgBzAHEBYABAAlACcKADYHAAcMABMQKgBgUCcgJ-AYpAEAPwDPFxAHABcQB0BHAEcQ
+ggAfH-AzAP------------------------------------------------------------------
+PlBtPTh9fQ==
+:: gfx/.info.pod
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3IixzdG9yZWQ9IjIwMjQtMDQt
+MDYgMjE6MjY6MjciXV1sejQABAAAAAMAAAAwbmls
+:: main.lua
+--[[pod_format="raw",created="2024-04-06 21:26:27",modified="2024-04-07 01:52:33",revision=973]]
+api = "https://picoroom.fly.dev/"
+
+debug = false
+room = flr(rnd(30) + 1)
+screenwidth = 460
+screenheight = 260
+midx = 460 / 2
+midy = 260 / 2
+roomwidth = 400
+roomheight = 200
+px = midx
+py = midy
+crowd = {}
+userid = sub("" .. rnd(), 3)
+usersprite = 0
+usercolor1 = 13
+usercolor2 = 31
+startmenu = true
+startmenutab = 0
+
+updatecor = nil
+movecor = nil
+lastroomfetch = nil
+
+updaten = 0
+
+function _init()
+  
+end
+
+function drawMenu()
+end
+
+function clamp(lo, hi, n)
+  if n > hi then
+    return lo
+  elseif n < lo then
+    return hi
+  else
+    return n
+  end
+end
+
+function updateMenu()
+  if btnp(0) then
+    if startmenutab == 0 then
+      room = clamp(1, 31, room - 1)
+    elseif startmenutab == 1 then
+      usersprite = clamp(0, 3, usersprite - 1)
+    elseif startmenutab == 2 then
+      usercolor1 = clamp(1, 31, usercolor1 - 1)
+    elseif startmenutab == 3 then
+      usercolor2 = clamp(1, 31, usercolor2 - 1)
+    end
+  elseif btnp(1) then
+    if startmenutab == 0 then
+      room = clamp(1, 31, room + 1)
+    elseif startmenutab == 1 then
+      usersprite = clamp(0, 3, usersprite + 1)
+    elseif startmenutab == 2 then
+      usercolor1 = clamp(1, 31, usercolor1 + 1)
+    elseif startmenutab == 3 then
+      usercolor2 = clamp(1, 31, usercolor2 + 1)
+    end
+  elseif btnp(2) then
+    if startmenutab > 0 then
+      startmenutab -= 1
+    end
+  elseif btnp(3) then
+    startmenutab += 1
+  end
+  
+  if startmenutab > 3 then
+    startmenu = false
+    updatecor = cocreate(updateRoomRoutine)
+  end
+end
+
+function fmtmenuitem(selected, str)
+  if selected then
+    return "< " .. str .. " >"
+  else
+    return "  " .. str .. "  "
+  end
+end
+
+function _draw()
+  if startmenu then
+    cls()
+    pal()
+    print(fmtmenuitem(startmenutab == 0, "Room " .. room))
+    print(fmtmenuitem(startmenutab == 1, "Body " .. usersprite))
+    print(fmtmenuitem(startmenutab == 2, "Skin " .. usercolor1))
+    print(fmtmenuitem(startmenutab == 3, "Eyes " .. usercolor2))    
+    drawUser()
+    return
+  end
+
+  cls()
+  pal()
+  drawRoom()
+  drawCrowd()
+  drawUser()
+  
+  local st = unpod(lastroomfetch)
+  if st == nil then
+    st = {}
+  end
+  if st.users == nil then
+    st.users = {}
+  end
+  
+  if debug then
+    print(updaten)
+    print(pod((st.users or {})[1]))
+    print(pod((st.users or {})[2]))
+    print(pod(crowd))
+  end
+end
+
+function _update()
+  if startmenu then
+    updateMenu()
+    return
+  end
+
+  moveUser()
+
+  if updatecor and costatus(updatecor) != "dead" then
+    coresume(updatecor)
+  else
+    updatecore = cocreate(updateRoomRoutine)
+  end
+  
+  if movecor and costatus(movecor) != "dead" then
+    coresume(movecor)
+  end
+end
+
+function getState()
+  local state = {
+    t = t(),
+    px = px,
+    py = py,
+  }
+  return state
+end
+
+function move(dx, dy)
+  px = px + dx
+  py = py + dy
+end
+
+function drawRoom()
+  local midy = 260 / 2
+  local midx = 460 / 2
+  local height = 200
+  local width = 400
+  oval(midx - width / 2, midy - height / 2,
+       midx + width / 2, midy + height / 2,
+       room)
+end
+
+function drawCrowd()
+  for i = 1, #crowd do
+    local user = crowd[i]
+    pal(7, user.c1)
+    pal(6, user.c2)
+    spr(user.s, user.x, user.y)
+  end
+end
+
+function drawUser()
+  pal(7, usercolor1)
+  pal(6, usercolor2)
+  spr(usersprite, px, py)
+end
+
+function moveUser()
+  local dx = 0
+  local dy = 0
+  if btnp(0) then
+    dx -= 16
+  elseif btnp(1) then
+    dx += 16
+  elseif btnp(2) then
+    dy -= 8
+  elseif btnp(3) then
+    dy += 8
+  end
+  
+  if inRoom(px + dx, py + dy) and not (dx == 0 and dy == 0) then
+    px = px + dx
+    py = py + dy
+
+
+  movecor = cocreate(function()
+    local op = opUsermove()
+    lastroomfetch = fetch(api .. "room/" .. room .. "?" .. op)
+    local roomdata = unpod(lastroomfetch)
+    for i = 1,#roomdata.users do
+      if roomdata.users[i].id == userid then
+        table.remove(roomdata.users, i)
+      end
+    end
+    crowd = roomdata.users
+    updaten += 1
+  end)
+  end
+end
+
+function opUsermove()
+  return userid .. "," .. usersprite .. "," .. usercolor1 .. "," ..
+    usercolor2 .. "," .. px .. "," .. py
+end
+
+function updateRoomRoutine()
+  while true do
+    updateRoom(room)
+    yield()
+  end
+end
+
+function updateRoom(roomId)
+  local op = opUsermove()
+  lastroomfetch = fetch(api .. "room/" .. roomId .. "?" .. op)
+  local roomdata = unpod(lastroomfetch)
+  local crowdUsers = roomdata.users
+  if crowdUsers == nil then
+    crowdUsers = {}
+  end
+  for i = 1,#crowdUsers do
+    if crowdUsers[i].id == userid then
+      table.remove(crowdUsers, i)
+    end
+  end
+  crowd = crowdUsers
+  updaten += 1
+end
+
+function inOval(x, y, cx, cy, rx, ry)
+  return ( (x-cx)*(x-cx) / (rx*rx) + (y-cy)*(y-cy) / (ry*ry) ) < 1
+end
+
+function inRoom(x, y)
+  return inOval(x + 8, y + 8, midx, midy, (roomwidth + 16) / 2, roomheight / 2)
+end
+
+:: map/
+:: map/0.map
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3Iixtb2RpZmllZD0iMjAyNC0w
+NC0wNyAwMTo1MjozMyIscmV2aXNpb249NzcxXV1sejQAWgAAAEsQAADwCHt7Ym1wPXVzZXJkYXRh
+KCJpMTYiLDMyAwAvIjABAP--------------------uhIikscGFuX3g9MAgA0nk9MCx0aWxlX2g9
+MTYKABB3CgCAem9vbT0xfX0=
+:: map/.info.pod
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3IixzdG9yZWQ9IjIwMjQtMDQt
+MDYgMjE6MjY6MjciXV1sejQABAAAAAMAAAAwbmls
+:: sfx/
+:: sfx/0.sfx
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3Iixtb2RpZmllZD0iMjAyNC0w
+NC0wNyAwMTo1MjozMyIscmV2aXNpb249NzY5XV1sejQAEQEAAMEIAADwJ3B4dQADKAAAAwAED0AQ
+Ag4AAaABIAKgDgAPEAAN8MoBAgMEBQYHAA--kAgJCgsPDA8NDw4PDxAA8AANDxEPEg8TDxQPFQ8W
+DxcTAPEBDxgPGQ8aDxsPHA8dDx4PHxQA8QAgDyEPIg8jDyQPJQ8mDycUAPEAKA8pDyoPKw8sDy0P
+Lg8vFADxADAPMQ8yDzMPNA81DzYPNxQA-wU4DzkPOg87DzwPPQ8_Dz8AD--w-wEA6-8nWgEQBg8g
+EAEgASAB8AACEAIMEAEgDyEgATAPQPDDDygP--DGD-gKD-8PgA-3Dw0B8AkBEAYMMAD--7of-wEA
+zL-oD0AADUD--7DwcAoA--9kH-8BAJdQ-----x8=
+:: sfx/.info.pod
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI0LTA0LTA2IDIxOjI2OjI3IixzdG9yZWQ9IjIwMjQtMDQt
+MDYgMjE6MjY6MjciXV1sejQABAAAAAMAAAAwbmls
+:: .info.pod
+b64$LS1bW3BvZCxydW50aW1lPTUsc3RvcmVkPSIyMDI0LTA0LTA3IDAxOjUyOjMzIix3b3Jrc3Bh
+Y2VzPXt7bG9jYXRpb249Im1haW4ubHVhIzciLHdvcmtzcGFjZV9pbmRleD0xfSx7bG9jYXRpb249
+ImdmeC8wLmdmeCIsd29ya3NwYWNlX2luZGV4PTJ9LHtsb2NhdGlvbj0ibWFwLzAubWFwIix3b3Jr
+c3BhY2VfaW5kZXg9M30se2xvY2F0aW9uPSJzZngvMC5zZngiLHdvcmtzcGFjZV9pbmRleD00fX1d
+XWx6NAAEAAAAAwAAADBuaWw=
+:: [eoc]
