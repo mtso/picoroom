@@ -113,6 +113,7 @@ http.createServer((req, res) => {
   const roomData = renderRoomData(data[roomId] || []);
   // res.write(Buffer.from(data).toString("base64"));
   // res.writeHead(200, { 'Content-Type': 'charset=utf-8; application/pod' });
+  res.writeHead(200, { 'Access-Control-Allow-Origin' : '*' });
   res.write(roomData);
   res.end();
 }).listen(port);
